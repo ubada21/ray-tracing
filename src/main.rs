@@ -94,13 +94,8 @@ fn main() {
         
             let r: Ray = Ray::new(origin, lower_left_corner + horizontal * u + vertical * v - origin);
             let pixel_color: Colour = ray_color(&r, &world);
-            // colour::write_colour(pixel_color);
+            colour::write_colour(pixel_color);
 
-            let ir = (255.99 * pixel_color.x()) as i32;
-            let ig = (255.99 * pixel_color.y()) as i32;
-            let ib = (255.99 * pixel_color.z()) as i32;
-
-            println!("{} {} {}", ir, ig, ib);
         
         }
     }

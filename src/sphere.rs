@@ -1,9 +1,3 @@
-
-#![crate_type = "lib"]
-
-// mod vec3;
-// mod ray;
-// mod hittable;
 use crate::ray::{Ray, Point3};
 use crate::hittable::{HitRecord, Hittable};
 use crate::vec3::Vec3;
