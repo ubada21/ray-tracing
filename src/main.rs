@@ -1,13 +1,14 @@
-mod colour;
+
 mod ray;
 mod hittable;
 mod hittable_list;
 mod sphere;
-use std::f32::INFINITY;
+use std::{f32::INFINITY, char::MAX};
 mod camera;
+mod material;
+
 use camera::Camera;
 use ray::Ray;
-use colour::Colour;
 mod vec3;
 use vec3::Vec3;
 use ray::Point3;
@@ -15,21 +16,35 @@ use hittable::{HitRecord, Hittable};
 use hittable_list::HittableList;
 use sphere::Sphere;
 use rand::prelude::*;
+use material::{Material, scatter};
 
-fn ray_color(ray: &Ray, world: &HittableList) -> Colour {
+fn ray_color(ray: &Ray, world: &HittableList, depth: f32) -> Vec3 {
 
-    let mut rec = HitRecord::default();
 
-    if world.hit(&ray, 0.0, INFINITY, &mut rec) {
-        return Colour::new(
-            1.0 + rec.normal().x(),
-            1.0 + rec.normal().y(),
-            1.0 + rec.normal().z()) * 0.5;
+    if depth <= 0.0 {
+        return Vec3::new(0.0, 0.0, 0.0);
+    }
+
+        
+        if let Some(rec) = world.hit(ray, 0.001, std::f32::MAX) {
+
+            let mut scattered = Ray::new(Vec3::default(), Vec3::default());
+            let mut attenuation = Vec3::default();
+
+        if scatter(&rec.material, ray, &rec, &mut attenuation, &mut scattered) {
+            return attenuation * ray_color(&scattered, world, depth - 1.0);
+        }
+        
+        return Vec3::new(0.0,0.0,0.0);
+
+
+
+        // let target = rec.point() + rec.normal() + random_in_unit_sphere();    
+        // return ray_color(&Ray::new(rec.point(), target-rec.point()), &world, depth - 1.0) * 0.5;
     } else {
-
-        let unit_direction = ray.direction.unit_vector();
-        let t = (unit_direction.y + 1.0) * 0.5;
-        return Colour::new(1.0, 1.0, 1.0)*(1.0 - t) + Colour::new(0.5, 0.7, 1.0)*t;
+        let unit_direction = ray.direction().unit_vector();
+        let t = (unit_direction.y() + 1.0) * 0.5;
+        return Vec3::new(1.0, 1.0, 1.0)*(1.0 - t) + Vec3::new(0.5, 0.7, 1.0)*t;
     }
 }
 
@@ -37,7 +52,7 @@ fn random_in_unit_sphere() -> Vec3 {
     let mut p = Vec3::default();
     let mut rng = rand::thread_rng();
     loop {
-        p  = Vec3::new(rng.gen::<f32>(), rng.gen::<f32>(), rng.gen::<f32>()) * 2.0 - Vec3::new(1.0,1.0,1.0);
+        p  = (Vec3::new(rng.gen::<f32>(), rng.gen::<f32>(), rng.gen::<f32>()) * 2.0) - Vec3::new(1.0,1.0,1.0);
 
         if p.length_squared() < 1.0 {
             return p;
@@ -72,15 +87,17 @@ fn main() {
 
     // Image
 
-    const ASPECT_RATIO: f32 = 16.0/9.0;
-    const IMAGE_WIDTH: f32 = 200.0;
-    const IMAGE_HEIGHT: f32 = 100.0;
+    const IMAGE_WIDTH: f32 = 1000.0;
+    const IMAGE_HEIGHT: f32 = 500.0;
     const SAMPLES_PER_PIXEL: f32 = 100.0;
+    const MAX_DEPTH: f32 = 50.0;
 
     //World 
     let mut list: Vec<Box<dyn Hittable>> = Vec::new();
-    list.push(Box::new(Sphere::new(Point3::new(0.0, 0.0, -1.0), 0.5)));
-    list.push(Box::new(Sphere::new(Point3::new(0.0, -100.5, -1.0), 100.0)));
+    list.push(Box::new(Sphere::new(Point3::new(0.0, -100.5, -1.0), 100.0, Material::Lambertian{albedo: Vec3::new(0.8, 0.8, 0.0)})));
+    list.push(Box::new(Sphere::new(Point3::new(0.0, 0.0, -1.0), 0.5, Material::Lambertian{albedo: Vec3::new(0.7, 0.3, 0.3)})));
+    list.push(Box::new(Sphere::new(Point3::new(-1.0, 0.0, -1.0), 0.5, Material::Metal{albedo: Vec3::new(0.8, 0.8, 0.8), fuzz: 0.3})));
+    list.push(Box::new(Sphere::new(Point3::new(1.0, 0.0, -1.0), 0.5, Material::Metal{albedo: Vec3::new(0.8, 0.6, 0.2), fuzz:1.0})));
 
     let world = HittableList::new(list);
 
@@ -96,18 +113,25 @@ fn main() {
         eprintln!("\rScanlines Remaining: {}", j);
         for i in 0..IMAGE_WIDTH as i32 {
             let mut pixel_colour = Vec3::new(0.0, 0.0, 0.0);
+
             for s in 0..SAMPLES_PER_PIXEL as i32 {
                 
-                let u = (i as f32 + rng.gen::<f32>()) / (IMAGE_WIDTH - 1.0) as f32;
-                let v = (j as f32 + rng.gen::<f32>()) / (IMAGE_HEIGHT - 1.0) as f32;
+                let u = (i as f32 + rng.gen::<f32>()) / (IMAGE_WIDTH) as f32;
+                let v = (j as f32 + rng.gen::<f32>()) / (IMAGE_HEIGHT) as f32;
+
                 let r = &cam.get_ray(u, v);
-                pixel_colour = pixel_colour + ray_color(r, &world);
+                pixel_colour += ray_color(&r, &world, MAX_DEPTH);
             }
             pixel_colour = pixel_colour / SAMPLES_PER_PIXEL as f32;
+            //pixel_colour = Vec3::new(, pixel_colour.y().sqrt(), pixel_colour.z().sqrt());
+            let mut r = pixel_colour.x().sqrt();
+            let mut g = pixel_colour.y().sqrt();
+            let mut b = pixel_colour.z().sqrt();
 
-            let ir = (255.99 * pixel_colour.x()) as i32;
-            let ig = (255.99 * pixel_colour.y()) as i32;
-            let ib = (255.99 * pixel_colour.z()) as i32;
+            let ir = (255.99 * r) as i32;
+            let ig = (255.99 * g) as i32;
+            let ib = (255.99 * b) as i32;
+
             println!("{} {} {}", ir, ig, ib);
         }
     }

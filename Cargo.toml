@@ -7,3 +7,6 @@ edition = "2021"
 
 [dependencies]
 rand = "0.8.4"
+tailcall = "0.1.5"
+decurse = "0.0.4"
+stacker = "0.1"

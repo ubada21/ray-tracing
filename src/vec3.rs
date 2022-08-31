@@ -28,6 +28,16 @@ impl Vec3 {
         Vec3 {x: x, y: y, z: z}
     }
 
+    pub fn near_zero(&self) -> bool {
+        let s = 1e-8;
+
+        return self.x < s && self.y < s && self.z < s;
+    }
+
+    pub fn reflect(v: Vec3, n: Vec3) -> Vec3 {
+        return v - (n * ((v.dot(&n)) * 2.0));
+    }
+
     pub fn length_squared(&self) -> f32 {
         return self.x * self.x + self.y * self.y + self.z * self.z;
     }
@@ -107,6 +117,7 @@ impl Mul<f32> for Vec3 {
         Self {x: self.x * num, y: self.y * num, z: self.z * num}
     }
 }
+
 
 impl MulAssign for Vec3 {
 
